@@ -58,3 +58,19 @@ class Account(BaseModel):
         self.transactions = []
         self.portfolio_value_time_series = []
         self.save()
+
+    def deposit(self, amount: float):
+        """ Deposit funds into the account. """
+        if amount <= 0:
+            raise ValueError("Deposit amount must be positive.")
+        self.balance += amount
+        print(f"Deposited ${amount}. New balance: ${self.balance}")
+        self.save()
+
+    def withdraw(self, amount: float):
+        """ Withdraw funds from the account, ensuring it doesn't go negative. """
+        if amount > self.balance:
+            raise ValueError("Insufficient funds for withdrawal.")
+        self.balance -= amount
+        print(f"Withdrew ${amount}. New balance: ${self.balance}")
+        self.save()
