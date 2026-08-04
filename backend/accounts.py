@@ -47,3 +47,14 @@ class Account(BaseModel):
             }
             write_account(name, fields)
         return cls(**fields)
+
+    def save(self):
+        write_account(self.name.lower(), self.model_dump())
+
+    def reset(self, strategy: str = ""):
+        self.balance = INITIAL_BALANCE
+        self.strategy = strategy
+        self.holdings = {}
+        self.transactions = []
+        self.portfolio_value_time_series = []
+        self.save()
