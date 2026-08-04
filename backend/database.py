@@ -42,3 +42,46 @@ def read_account(name):
             'SELECT account FROM accounts WHERE name = ?', (name.lower(),))
         row = cursor.fetchone()
         return json.loads(row[0]) if row else None
+
+
+def write_log(name: str, type: str, message: str):
+    """
+    Write a log entry to the logs table.
+
+    Args:
+        name (str): The name associated with the log
+        type (str): The type of log entry
+        message (str): The log message
+    """
+    now = datetime.now().isoformat()
+
+    with sqlite3.connect(DB) as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO logs (name, datetime, type, message)
+            VALUES (?, datetime('now'), ?, ?)
+        ''', (name.lower(), type, message))
+        conn.commit()
+
+
+def read_log(name: str, last_n=10):
+    """
+    Read the most recent log entries for a given name.
+
+    Args:
+        name (str): The name to retrieve logs for
+        last_n (int): Number of most recent entries to retrieve
+
+    Returns:
+        list: A list of tuples containing (datetime, type, message)
+    """
+    with sqlite3.connect(DB) as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT datetime, type, message FROM logs 
+            WHERE name = ? 
+            ORDER BY datetime DESC
+            LIMIT ?
+        ''', (name.lower(), last_n))
+
+        return reversed(cursor.fetchall())
