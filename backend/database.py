@@ -33,3 +33,12 @@ def write_account(name, account_dict):
             ON CONFLICT(name) DO UPDATE SET account=excluded.account
         ''', (name.lower(), json_data))
         conn.commit()
+
+
+def read_account(name):
+    with sqlite3.connect(DB) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            'SELECT account FROM accounts WHERE name = ?', (name.lower(),))
+        row = cursor.fetchone()
+        return json.loads(row[0]) if row else None
