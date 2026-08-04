@@ -80,3 +80,15 @@ class Account(BaseModel):
         initial_spend = sum(transaction.total()
                             for transaction in self.transactions)
         return portfolio_value - initial_spend - self.balance
+
+    def get_holdings(self):
+        """ Report the current holdings of the user. """
+        return self.holdings
+
+    def get_profit_loss(self):
+        """ Report the user's profit or loss at any point in time. """
+        return self.calculate_profit_loss()
+
+    def list_transactions(self):
+        """ List all transactions made by the user. """
+        return [transaction.model_dump() for transaction in self.transactions]
