@@ -105,3 +105,15 @@ class Account(BaseModel):
         data["total_profit_loss"] = pnl
         write_log(self.name, "account", "Retrieved account details")
         return json.dumps(data)
+
+    def get_strategy(self) -> str:
+        """ Return the strategy of the account """
+        write_log(self.name, "account", "Retrieved strategy")
+        return self.strategy
+
+    def change_strategy(self, strategy: str) -> str:
+        """ At your discretion, if you choose to, call this to change your investment strategy for the future """
+        self.strategy = strategy
+        self.save()
+        write_log(self.name, "account", "Changed strategy")
+        return "Changed strategy"
