@@ -74,3 +74,9 @@ class Account(BaseModel):
         self.balance -= amount
         print(f"Withdrew ${amount}. New balance: ${self.balance}")
         self.save()
+
+    def calculate_profit_loss(self, portfolio_value: float):
+        """ Calculate profit or loss from the initial spend. """
+        initial_spend = sum(transaction.total()
+                            for transaction in self.transactions)
+        return portfolio_value - initial_spend - self.balance
