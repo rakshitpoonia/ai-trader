@@ -92,3 +92,16 @@ class Account(BaseModel):
     def list_transactions(self):
         """ List all transactions made by the user. """
         return [transaction.model_dump() for transaction in self.transactions]
+
+    def report(self) -> str:
+        """ Return a json string representing the account.  """
+        portfolio_value = self.calculate_portfolio_value()
+        self.portfolio_value_time_series.append(
+            (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), portfolio_value))
+        self.save()
+        pnl = self.calculate_profit_loss(portfolio_value)
+        data = self.model_dump()
+        data["total_portfolio_value"] = portfolio_value
+        data["total_profit_loss"] = pnl
+        write_log(self.name, "account", "Retrieved account details")
+        return json.dumps(data)
