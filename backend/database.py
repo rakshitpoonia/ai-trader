@@ -21,3 +21,15 @@ with sqlite3.connect(DB) as conn:
         )
     ''')
     conn.commit()
+
+
+def write_account(name, account_dict):
+    json_data = json.dumps(account_dict)
+    with sqlite3.connect(DB) as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO accounts (name, account)
+            VALUES (?, ?)
+            ON CONFLICT(name) DO UPDATE SET account=excluded.account
+        ''', (name.lower(), json_data))
+        conn.commit()
