@@ -107,6 +107,34 @@ class Account(BaseModel):
                             for transaction in self.transactions)
         return portfolio_value - initial_spend - self.balance
 
+    def sell_shares(self, symbol: str, quantity: int, rationale: str) -> str:
+        """ Sell shares of a stock if the user has enough shares. """
+        if self.holdings.get(symbol, 0) < quantity:
+            raise ValueError(
+                f"Cannot sell {quantity} shares of {symbol}. Not enough shares held.")
+
+        price = get_share_price(symbol)
+        sell_price = price * (1 - SPREAD)
+        total_proceeds = sell_price * quantity
+
+        # Update holdings
+        self.holdings[symbol] -= quantity
+
+        # If shares are completely sold, remove from holdings
+        if self.holdings[symbol] == 0:
+            del self.holdings[symbol]
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        # Record transaction
+        transaction = Transaction(symbol=symbol, quantity=-quantity, price=sell_price,
+                                  timestamp=timestamp, rationale=rationale)  # negative quantity for sell
+        self.transactions.append(transaction)
+
+        # Update balance
+        self.balance += total_proceeds
+        self.save()
+        write_log(self.name, "account", f"Sold {quantity} of {symbol}")
+        return "Completed. Latest details:\n" + self.report()
+
     def get_holdings(self):
         """ Report the current holdings of the user. """
         return self.holdings
