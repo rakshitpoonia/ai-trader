@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "fastmcp>=2.14.1",
+    "massive>=2.8.0",
     "mcp>=2.0.0",
     "openai-agents>=0.0.7",
     "pydantic>=2.13.4",
