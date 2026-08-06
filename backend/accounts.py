@@ -2,6 +2,7 @@ from pydantic import BaseModel
 import json
 from dotenv import load_dotenv
 from datetime import datetime
+from .market import get_share_price
 from .database import write_account, read_account, write_log
 
 
@@ -74,6 +75,31 @@ class Account(BaseModel):
         self.balance -= amount
         print(f"Withdrew ${amount}. New balance: ${self.balance}")
         self.save()
+
+    def buy_shares(self, symbol: str, quantity: int, rationale: str) -> str:
+        """ Buy shares of a stock if sufficient funds are available. """
+        price = get_share_price(symbol)
+        buy_price = price * (1 + SPREAD)
+        total_cost = buy_price * quantity
+
+        if total_cost > self.balance:
+            raise ValueError("Insufficient funds to buy shares.")
+        elif price == 0:
+            raise ValueError(f"Unrecognized symbol {symbol}")
+
+        # Update holdings
+        self.holdings[symbol] = self.holdings.get(symbol, 0) + quantity
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        # Record transaction
+        transaction = Transaction(symbol=symbol, quantity=quantity,
+                                  price=buy_price, timestamp=timestamp, rationale=rationale)
+        self.transactions.append(transaction)
+
+        # Update balance
+        self.balance -= total_cost
+        self.save()
+        write_log(self.name, "account", f"Bought {quantity} of {symbol}")
+        return "Completed. Latest details:\n" + self.report()
 
     def calculate_profit_loss(self, portfolio_value: float):
         """ Calculate profit or loss from the initial spend. """
