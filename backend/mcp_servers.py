@@ -36,3 +36,34 @@ def trader_mcp_servers() -> list[MCPServerStdio]:
         market_params,
     ]
     return [MCPServerStdio(p, client_session_timeout_seconds=TIMEOUT) for p in params]
+
+# the researcher's MCP servers: Fetch, Tavily web search and Memory.
+
+
+def researcher_mcp_servers(name: str) -> list[MCPServerStdio]:
+    """The researcher's MCP servers: Fetch, Tavily web search and Memory.
+
+    Tavily's server offers several tools; we restrict it to web search so the
+    researcher reaches for plain search rather than its heavier crawl or deep-research tools.
+    """
+    fetch = MCPServerStdio(
+        {"command": "uvx", "args": ["mcp-server-fetch"]},
+        client_session_timeout_seconds=TIMEOUT,
+    )
+    search = MCPServerStdio(
+        {"command": "npx", "args": [
+            "-y", "tavily-mcp@latest"], "env": tavily_env},
+        client_session_timeout_seconds=TIMEOUT,
+        tool_filter=create_static_tool_filter(
+            # restricts the researcher to just the search tool
+            allowed_tool_names=["tavily_search"]),
+    )
+    memory = MCPServerStdio(
+        {
+            "command": "npx",
+            "args": ["-y", "mcp-memory-libsql"],
+            "env": {"LIBSQL_URL": f"file:./memory/{name}.db"},
+        },
+        client_session_timeout_seconds=TIMEOUT,
+    )
+    return [fetch, search, memory]
