@@ -45,3 +45,14 @@ def get_share_price_massive(symbol: str) -> float:
         except Exception:
             continue
     raise RuntimeError(f"No Massive price available for {symbol}")
+
+
+def is_market_open() -> bool:
+    """Whether the US market is open; True on simulated data or if Massive is unreachable."""
+    if not massive_api_key:
+        return True
+    try:
+        client = RESTClient(massive_api_key)
+        return client.get_market_status().market == "open"
+    except Exception:
+        return True
