@@ -25,3 +25,23 @@ def _snapshot(client: RESTClient, symbol: str) -> float:
 
 def _previous_close(client: RESTClient, symbol: str) -> float:
     return float(client.get_previous_close_agg(symbol)[0].close)
+
+
+price_methods = [_last_trade, _snapshot, _previous_close]
+plan_tier = 0
+
+
+# Best price first, previous close last. Lower tier plans reject the earlier calls
+# so we remember the first tier that works and start there next time.
+def get_share_price_massive(symbol: str) -> float:
+    """Best price the plan allows, remembering the working tier to avoid repeat failures."""
+    global plan_tier
+    client = RESTClient(massive_api_key)
+    for tier in range(plan_tier, len(price_methods)):
+        try:
+            price = price_methods[tier](client, symbol)
+            plan_tier = tier
+            return price
+        except Exception:
+            continue
+    raise RuntimeError(f"No Massive price available for {symbol}")
