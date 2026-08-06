@@ -9,6 +9,8 @@ import os
 from dotenv import load_dotenv
 from massive import RESTClient
 
+from .market_simulator import simulated_price
+
 load_dotenv(override=True)
 
 massive_api_key = os.getenv("MASSIVE_API_KEY")
@@ -29,6 +31,16 @@ def _previous_close(client: RESTClient, symbol: str) -> float:
 
 price_methods = [_last_trade, _snapshot, _previous_close]
 plan_tier = 0
+
+
+def get_share_price(symbol: str) -> float:
+    """Return the current price for a symbol, from Massive or the simulator."""
+    if massive_api_key:
+        try:
+            return get_share_price_massive(symbol)
+        except Exception as e:
+            print(f"Massive API unavailable ({e}); using a simulated price")
+    return simulated_price(symbol)
 
 
 # Best price first, previous close last. Lower tier plans reject the earlier calls
