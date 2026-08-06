@@ -24,3 +24,10 @@ Draw on your knowledge graph to build your expertise over time.
 If there isn't a specific request, then just respond with investment opportunities based on searching latest news.
 The current datetime is {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 """
+
+
+def research_tool():
+    return "This tool researches online for news and opportunities, \
+either based on your specific request to look into a certain stock, \
+or generally for notable financial news and opportunities. \
+Describe what kind of research you're looking for."
