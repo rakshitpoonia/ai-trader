@@ -3,6 +3,7 @@ from typing import Any
 from contextlib import AsyncExitStack
 from .accounts_client import read_accounts_resource, read_strategy_resource
 from agents import Agent, Tool, Runner, OpenAIChatCompletionsModel, trace
+from .tracers import make_trace_id
 from openai import AsyncOpenAI
 from dotenv import load_dotenv
 import os
@@ -113,3 +114,16 @@ class Trader:
                 for server in researcher_mcp_servers(self.name)
             ]
             await self.run_agent(trader_servers, researcher_servers)
+
+    async def run_with_trace(self):
+        trace_name = f"{self.name}-trading" if self.do_trade else f"{self.name}-rebalancing"
+        trace_id = make_trace_id(f"{self.name.lower()}")
+        with trace(trace_name, trace_id=trace_id):
+            await self.run_with_mcp_servers()
+
+    async def run(self):
+        try:
+            await self.run_with_trace()
+        except Exception as e:
+            print(f"Error running trader {self.name}: {e}")
+        self.do_trade = not self.do_trade
