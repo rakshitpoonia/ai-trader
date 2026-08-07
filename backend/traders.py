@@ -69,7 +69,7 @@ async def get_researcher_tool(mcp_servers, model_name) -> Tool:
 
 
 class Trader:
-    def __init__(self, name: str, lastname="Trader", model_name="gpt-5.4-mini"):
+    def __init__(self, name: str, lastname="Trader", model_name="nvidia/nemotron-3-super-120b-a12b:free"):
         self.name = name
         self.lastname = lastname
         self.agent = None
