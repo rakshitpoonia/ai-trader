@@ -73,3 +73,14 @@ class Trader:
         self.agent = None
         self.model_name = model_name
         self.do_trade = True
+
+    async def create_agent(self, trader_mcp_servers, researcher_mcp_servers) -> Agent:
+        tool = await get_researcher_tool(researcher_mcp_servers, self.model_name)
+        self.agent = Agent(
+            name=self.name,
+            instructions=trader_instructions(self.name),
+            model=get_model(self.model_name),
+            tools=[tool],
+            mcp_servers=trader_mcp_servers,
+        )
+        return self.agent
