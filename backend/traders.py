@@ -1,6 +1,7 @@
 from typing import Any
 
 from contextlib import AsyncExitStack
+from .accounts_client import read_accounts_resource, read_strategy_resource
 from agents import Agent, Tool, Runner, OpenAIChatCompletionsModel, trace
 from openai import AsyncOpenAI
 from dotenv import load_dotenv
@@ -84,3 +85,20 @@ class Trader:
             mcp_servers=trader_mcp_servers,
         )
         return self.agent
+
+    async def get_account_report(self) -> str:
+        account = await read_accounts_resource(self.name)
+        account_json = json.loads(account)
+        account_json.pop("portfolio_value_time_series", None)
+        return json.dumps(account_json)
+
+    async def run_agent(self, trader_mcp_servers, researcher_mcp_servers):
+        self.agent = await self.create_agent(trader_mcp_servers, researcher_mcp_servers)
+        account = await self.get_account_report()
+        strategy = await read_strategy_resource(self.name)
+        message = (
+            trade_message(self.name, strategy, account)
+            if self.do_trade
+            else rebalance_message(self.name, strategy, account)
+        )
+        await Runner.run(self.agent, message, max_turns=MAX_TURNS)
