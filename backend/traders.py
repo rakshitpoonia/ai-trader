@@ -49,3 +49,18 @@ def get_model(model_name: str):
         return OpenAIChatCompletionsModel(model=model_name, openai_client=gemini_client)
     else:
         return model_name
+
+
+async def get_researcher(mcp_servers, model_name) -> Agent:
+    researcher = Agent[Any](
+        name="Researcher",
+        instructions=researcher_instructions(),
+        model=get_model(model_name),
+        mcp_servers=mcp_servers,
+    )
+    return researcher
+
+
+async def get_researcher_tool(mcp_servers, model_name) -> Tool:
+    researcher = await get_researcher(mcp_servers, model_name)
+    return researcher.as_tool(tool_name="Researcher", tool_description=research_tool())
