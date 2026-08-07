@@ -102,3 +102,14 @@ class Trader:
             else rebalance_message(self.name, strategy, account)
         )
         await Runner.run(self.agent, message, max_turns=MAX_TURNS)
+
+    async def run_with_mcp_servers(self):
+        async with AsyncExitStack() as stack:
+            trader_servers = [
+                await stack.enter_async_context(server) for server in trader_mcp_servers()
+            ]
+            researcher_servers = [
+                await stack.enter_async_context(server)
+                for server in researcher_mcp_servers(self.name)
+            ]
+            await self.run_agent(trader_servers, researcher_servers)
