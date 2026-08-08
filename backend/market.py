@@ -6,6 +6,7 @@ making trades on simulated prices. This still runs out of the box.
 
 
 import os
+import time
 from dotenv import load_dotenv
 from massive import RESTClient
 
@@ -33,14 +34,44 @@ price_methods = [_last_trade, _snapshot, _previous_close]
 plan_tier = 0
 
 
+# A symbol must keep the same price source for the whole process. Real and simulated prices
+# for one ticker can differ by a factor of two, so a position bought at a simulated price and
+# later valued at a real one shows a large invented profit or loss. Massive's cheaper plans
+# also rate limit, which made the source flip mid-run; that is what these two caches prevent.
+PRICE_TTL_SECONDS = 60.0
+_price_cache: dict[str, tuple[float, float]] = {}  # symbol -> (price, monotonic time)
+_simulated_symbols: set[str] = set()  # symbols Massive never priced; simulated from now on
+
+
 def get_share_price(symbol: str) -> float:
-    """Return the current price for a symbol, from Massive or the simulator."""
-    if massive_api_key:
+    """Return the current price for a symbol, from Massive or the simulator.
+
+    Repeated lookups inside PRICE_TTL_SECONDS reuse the cached price, which keeps a single
+    agent turn self-consistent and keeps four traders from exhausting the rate limit.
+    """
+    symbol = symbol.upper()
+    cached = _price_cache.get(symbol)
+    if cached and time.monotonic() - cached[1] < PRICE_TTL_SECONDS:
+        return cached[0]
+
+    if massive_api_key and symbol not in _simulated_symbols:
         try:
-            return get_share_price_massive(symbol)
+            price = get_share_price_massive(symbol)
+            _price_cache[symbol] = (price, time.monotonic())
+            return price
         except Exception as e:
-            print(f"Massive API unavailable ({e}); using a simulated price")
-    return simulated_price(symbol)
+            # Serve the last real price rather than crossing over to simulated ones. Stale
+            # is better than inconsistent: a rate limit lasts seconds, the distortion lasts
+            # for as long as the position is held.
+            if cached:
+                print(f"Massive API unavailable ({e}); reusing last price for {symbol}")
+                return cached[0]
+            print(f"Massive API unavailable ({e}); {symbol} is now priced by the simulator")
+            _simulated_symbols.add(symbol)
+
+    price = simulated_price(symbol)
+    _price_cache[symbol] = (price, time.monotonic())
+    return price
 
 
 # Best price first, previous close last. Lower tier plans reject the earlier calls

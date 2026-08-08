@@ -101,6 +101,13 @@ class Account(BaseModel):
         write_log(self.name, "account", f"Bought {quantity} of {symbol}")
         return "Completed. Latest details:\n" + self.report()
 
+    def calculate_portfolio_value(self):
+        """ Calculate the total value of the user's portfolio. """
+        total_value = self.balance
+        for symbol, quantity in self.holdings.items():
+            total_value += get_share_price(symbol) * quantity
+        return total_value
+
     def calculate_profit_loss(self, portfolio_value: float):
         """ Calculate profit or loss from the initial spend. """
         initial_spend = sum(transaction.total()
