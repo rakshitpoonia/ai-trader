@@ -1,6 +1,7 @@
 from typing import Any
 
 from contextlib import AsyncExitStack
+from functools import lru_cache
 from .accounts_client import read_accounts_resource, read_strategy_resource
 from agents import Agent, Tool, Runner, OpenAIChatCompletionsModel, trace
 from .tracers import make_trace_id
@@ -31,24 +32,58 @@ OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
 MAX_TURNS = 30
 
+# OpenRouter's free-models router. Not a single model: for each request OpenRouter picks
+# at random from the free models available at that moment, keeping only those that support
+# what the request needs - tool calling, in our case, since the traders are useless without
+# it. Every trader runs on this by default, so the project costs nothing to run with just
+# an OPENROUTER_API_KEY. See backend/trading_floor.py for the trade-offs.
+FREE_MODEL_ROUTER = "openrouter/free"
 
-openrouter_client = AsyncOpenAI(
-    base_url=OPENROUTER_BASE_URL, api_key=openrouter_api_key)
-deepseek_client = AsyncOpenAI(
-    base_url=DEEPSEEK_BASE_URL, api_key=deepseek_api_key)
-grok_client = AsyncOpenAI(base_url=GROK_BASE_URL, api_key=grok_api_key)
-gemini_client = AsyncOpenAI(base_url=GEMINI_BASE_URL, api_key=google_api_key)
+
+# One OpenAI-compatible client per provider, built on first use and then reused.
+# They are deliberately not created at import time: AsyncOpenAI raises when its key is
+# missing, so building all four eagerly would stop the default FREE_MODEL_ROUTER path from
+# running for anyone who only has an OpenRouter key set.
+@lru_cache(maxsize=None)
+def get_client(base_url: str, api_key: str | None, provider: str) -> AsyncOpenAI:
+    if not api_key:
+        raise RuntimeError(
+            f"No API key for {provider}; set it in .env or use the default "
+            f"'{FREE_MODEL_ROUTER}' model (USE_MANY_MODELS=false)."
+        )
+    return AsyncOpenAI(base_url=base_url, api_key=api_key)
 
 
 def get_model(model_name: str):
+    # A "provider/model" slug is an OpenRouter one - this is the branch FREE_MODEL_ROUTER
+    # takes, and it must stay first, since slugs like "deepseek/deepseek-chat" name a
+    # provider that also has a direct endpoint below.
     if "/" in model_name:
-        return OpenAIChatCompletionsModel(model=model_name, openai_client=openrouter_client)
+        return OpenAIChatCompletionsModel(
+            model=model_name,
+            openai_client=get_client(
+                OPENROUTER_BASE_URL, openrouter_api_key, "OpenRouter"),
+        )
+    # Bare model names go direct to the provider that serves them, each over its own
+    # OpenAI-compatible endpoint. Used when USE_MANY_MODELS=true.
     elif "deepseek" in model_name:
-        return OpenAIChatCompletionsModel(model=model_name, openai_client=deepseek_client)
+        return OpenAIChatCompletionsModel(
+            model=model_name,
+            openai_client=get_client(
+                DEEPSEEK_BASE_URL, deepseek_api_key, "DeepSeek"),
+        )
     elif "grok" in model_name:
-        return OpenAIChatCompletionsModel(model=model_name, openai_client=grok_client)
+        return OpenAIChatCompletionsModel(
+            model=model_name,
+            openai_client=get_client(GROK_BASE_URL, grok_api_key, "Grok"),
+        )
     elif "gemini" in model_name:
-        return OpenAIChatCompletionsModel(model=model_name, openai_client=gemini_client)
+        return OpenAIChatCompletionsModel(
+            model=model_name,
+            openai_client=get_client(
+                GEMINI_BASE_URL, google_api_key, "Gemini"),
+        )
+    # Anything else is an OpenAI model name; the Agents SDK's own client handles it.
     else:
         return model_name
 
@@ -69,7 +104,7 @@ async def get_researcher_tool(mcp_servers, model_name) -> Tool:
 
 
 class Trader:
-    def __init__(self, name: str, lastname="Trader", model_name="nvidia/nemotron-3-super-120b-a12b:free"):
+    def __init__(self, name: str, lastname="Trader", model_name=FREE_MODEL_ROUTER):
         self.name = name
         self.lastname = lastname
         self.agent = None

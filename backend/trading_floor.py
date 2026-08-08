@@ -1,4 +1,4 @@
-from .traders import Trader
+from .traders import Trader, FREE_MODEL_ROUTER
 from typing import List
 import asyncio
 from .tracers import LogTracer
@@ -21,6 +21,9 @@ USE_MANY_MODELS = os.getenv(
 names = ["Warren", "George", "Ray", "Cathie"]
 lastnames = ["Patience", "Bold", "Systematic", "Crypto"]
 
+# USE_MANY_MODELS=true pits four different frontier models against each other, one per
+# trader, each called directly on its own provider's endpoint. Needs a paid API key for
+# every provider listed here (see get_model in traders.py).
 if USE_MANY_MODELS:
     model_names = [
         "gpt-5.5",
@@ -30,9 +33,18 @@ if USE_MANY_MODELS:
     ]
     short_model_names = ["GPT 5.5", "DeepSeek V4",
                          "Gemini 3.5 Flash", "Grok 4.3"]
+# The default: all four traders run on OpenRouter's free-models router, so the only key
+# needed is OPENROUTER_API_KEY. "openrouter/free" resolves per request to whichever free
+# model is available at that moment and supports tool calling, which means:
+#   - the model behind a trader changes between runs, so differences in their results
+#     reflect their strategies plus whatever model answered, not the strategies alone;
+#   - free models share a daily request cap on OpenRouter, and four traders each taking up
+#     to MAX_TURNS turns per cycle can burn through it, so keep RUN_EVERY_N_MINUTES
+#     generous - a run that stops early on a rate limit is caught and logged by Trader.run.
+# For a repeatable comparison, pin a specific slug here instead.
 else:
-    model_names = ["gpt-5.4-mini"] * 4
-    short_model_names = ["GPT 5.4 mini"] * 4
+    model_names = [FREE_MODEL_ROUTER] * 4
+    short_model_names = ["OpenRouter Free"] * 4
 
 
 def create_traders() -> List[Trader]:
