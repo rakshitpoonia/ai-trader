@@ -6,6 +6,7 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "fastmcp>=2.14.1",
+    "gradio>=6.22.0",
     "massive>=2.8.0",
     # Capped at <2 because openai-agents requires mcp<2. With mcp>=2 the resolver had to
     # fall all the way back to openai-agents 0.0.7, which lacks the MCP tool filters and
