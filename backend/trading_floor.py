@@ -2,7 +2,7 @@ from .traders import Trader, FREE_MODEL_ROUTER
 from typing import List
 import asyncio
 from .tracers import LogTracer
-from agents import add_trace_processor
+from agents import add_trace_processor, set_trace_processors
 from .market import is_market_open
 from dotenv import load_dotenv
 import os
@@ -56,7 +56,16 @@ def create_traders() -> List[Trader]:
 
 async def run_every_n_minutes():
 
-    add_trace_processor(LogTracer())
+    # LogTracer writes every span to the logs table, which is what the dashboard reads; it is
+    # always installed. The SDK also registers a default processor that ships spans to
+    # OpenAI's trace viewer, and that one needs OPENAI_API_KEY no matter which provider serves
+    # inference - without a key it warned "skipping trace export" on every export.
+    # With a key: add, so traces show up at platform.openai.com/traces as well as locally.
+    # Without: set, which replaces the list and drops the OpenAI exporter along with its noise.
+    if os.getenv("OPENAI_API_KEY"):
+        add_trace_processor(LogTracer())
+    else:
+        set_trace_processors([LogTracer()])
     traders = create_traders()
     while True:
         if RUN_EVEN_WHEN_MARKET_IS_CLOSED or is_market_open():
