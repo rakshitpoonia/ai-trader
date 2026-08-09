@@ -6,9 +6,21 @@ from .market import massive_api_key
 
 load_dotenv(override=True)
 
-PROJECT_DIR = str(Path(__file__).resolve().parent.parent)
+PROJECT_DIR = Path(__file__).resolve().parent.parent
 tavily_env = {"TAVILY_API_KEY": os.getenv("TAVILY_API_KEY")}
 TIMEOUT = 120
+
+# The same mcp<2 cap pyproject.toml applies to us, applied to the servers uvx builds in their
+# own throwaway environments. They ask for `mcp` unpinned, so uvx resolves 2.x, where
+# `mcp.server.fastmcp` is gone and `McpError` is spelled `MCPError` - both servers below then
+# die on import, and the agent sees only "Connection closed". Passing the cap with --with
+# forces uvx to resolve the 1.x line those servers were written against.
+MCP_PIN = "mcp<2"
+
+# Each trader's knowledge graph lives here, one SQLite file per name. libsql will not create
+# the directory itself; without it the memory server exits with "Unable to open connection".
+MEMORY_DIR = PROJECT_DIR / "memory"
+MEMORY_DIR.mkdir(exist_ok=True)
 
 
 # The market data server for the trader.
@@ -17,7 +29,11 @@ TIMEOUT = 120
 if massive_api_key:
     market_params = {
         "command": "uvx",
-        "args": ["--from", "git+https://github.com/massive-com/mcp_massive@v0.10.0", "mcp_massive"],
+        "args": [
+            "--from", "git+https://github.com/massive-com/mcp_massive@v0.10.0",
+            "--with", MCP_PIN,
+            "mcp_massive",
+        ],
         "env": {"MASSIVE_API_KEY": massive_api_key},
     }
 else:
@@ -47,7 +63,7 @@ def researcher_mcp_servers(name: str) -> list[MCPServerStdio]:
     researcher reaches for plain search rather than its heavier crawl or deep-research tools.
     """
     fetch = MCPServerStdio(
-        {"command": "uvx", "args": ["mcp-server-fetch"]},
+        {"command": "uvx", "args": ["--with", MCP_PIN, "mcp-server-fetch"]},
         client_session_timeout_seconds=TIMEOUT,
     )
     search = MCPServerStdio(
@@ -63,6 +79,9 @@ def researcher_mcp_servers(name: str) -> list[MCPServerStdio]:
             "command": "npx",
             "args": ["-y", "mcp-memory-libsql"],
             "env": {"LIBSQL_URL": f"file:./memory/{name}.db"},
+            # The path above is relative, so the server must start in the project root -
+            # otherwise it resolves against whatever directory the scheduler was launched from.
+            "cwd": PROJECT_DIR,
         },
         client_session_timeout_seconds=TIMEOUT,
     )
