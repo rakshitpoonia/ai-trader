@@ -4,8 +4,7 @@ The Gradio dashboard in demo/ reads accounts.db in-process. This serves the same
 data as JSON so a decoupled web frontend can render it. Everything here is
 read-only; the trading floor writes the database out of band.
 
-Run it from the 6_mcp directory so it shares the engine's accounts.db:
-
+Run with
     uv run uvicorn backend.api:app --port 8000
 """
 
