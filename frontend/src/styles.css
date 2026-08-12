@@ -1,0 +1,568 @@
+/* Autonomous Traders dashboard — minimal, flat, dark by default.
+
+   Rules this sheet holds itself to:
+   - no gradients and no shadows anywhere; depth comes from hairline borders
+   - one accent (yellow), spent only on the brand mark and the live leader
+   - green/red are semantic, reserved for direction of money
+   - everything else is a four-step grey ramp */
+
+:root {
+  --accent: #ecad0a;
+  --info: #209dd7;
+
+  --radius: 6px;
+  --hair: 1px;
+
+  --font: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+:root[data-theme="dark"] {
+  --bg: #0d0e11;
+  --surface: #14161a;
+  --inset: #101216;
+  --border: #23262d;
+  --border-strong: #333842;
+  --grid: #1b1e24;
+  --fg: #e7e9ec;
+  --fg-muted: #8d949f;
+  --fg-dim: #5c636f;
+
+  --up: #4cae86;
+  --down: #d4636d;
+}
+
+:root[data-theme="light"] {
+  --bg: #fafafb;
+  --surface: #ffffff;
+  --inset: #f6f7f8;
+  --border: #e4e6ea;
+  --border-strong: #ccd0d6;
+  --grid: #eef0f3;
+  --fg: #16181d;
+  --fg-muted: #5f6673;
+  --fg-dim: #979ea9;
+
+  --up: #2f8f63;
+  --down: #c04a54;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  font-family: var(--font);
+  font-size: 13px;
+  background: var(--bg);
+  color: var(--fg);
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  display: grid;
+  grid-template-columns: 224px 1fr;
+  /* Lock the body to the viewport so each panel row (1fr) has a concrete size for
+     uPlot's canvas to fill. Without this, 1fr falls back to content height and the
+     chart collapses to its minimum. */
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Thin, unobtrusive scrollbars — the log and trade streams both scroll. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 3px; }
+
+/* Shared micro-label: every section heading in the app uses this one style. */
+.side-label,
+.panel-col-label {
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--fg-dim);
+}
+
+/* ---- Sidebar ---- */
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+  padding: 22px 18px;
+  background: var(--surface);
+  border-right: var(--hair) solid var(--border);
+  overflow-y: auto;
+}
+
+.brand-block {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+}
+
+/* The accent's primary home: a 3px rule, not a coloured headline. */
+.brand-mark {
+  flex: none;
+  width: 3px;
+  height: 30px;
+  margin-top: 1px;
+  background: var(--accent);
+}
+
+.brand {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+  color: var(--fg);
+}
+
+.brand-sub {
+  margin: 3px 0 0;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: var(--fg-dim);
+}
+
+.side-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.market-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--fg);
+}
+
+.market-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--fg-dim);
+}
+.market-badge[data-source="simulator"] .market-dot { background: var(--info); }
+.market-badge[data-source="massive"] .market-dot { background: var(--up); }
+
+.market-status {
+  margin-top: -4px;
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+
+.returns-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.returns-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 0;
+  border-bottom: var(--hair) solid var(--border);
+}
+.returns-row:last-child { border-bottom: none; }
+
+.returns-name {
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+
+.returns-pct {
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-muted);
+}
+.returns-pct[data-trend="up"] { color: var(--up); }
+.returns-pct[data-trend="down"] { color: var(--down); }
+
+.sidebar-spacer { flex: 1; min-height: 12px; }
+
+.theme-toggle {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: var(--radius);
+  border: var(--hair) solid var(--border);
+  background: transparent;
+  color: var(--fg-dim);
+  cursor: pointer;
+  transition: color 120ms, border-color 120ms;
+}
+.theme-toggle:hover {
+  color: var(--fg);
+  border-color: var(--border-strong);
+}
+
+.theme-icon { display: none; }
+[data-theme="dark"] .icon-moon { display: block; }
+[data-theme="light"] .icon-sun { display: block; }
+
+/* ---- Panels ---- */
+
+/* Each row claims a floor of 600px and only stretches past it on a tall screen.
+   Below that the grid overflows and <main> scrolls, with the sidebar staying put
+   — the activity log keeping a usable height matters more than fitting in one
+   screen. */
+.panels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: repeat(2, minmax(600px, 1fr));
+  gap: 10px;
+  padding: 10px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* Rows: header, chart, holdings, streams. The streams take almost twice the
+   chart's share — the activity log is the panel's primary readout, and the chart
+   reads fine at a smaller size. */
+.panel {
+  display: grid;
+  grid-template-rows: auto 1.2fr auto 2.2fr;
+  gap: 12px;
+  padding: 16px;
+  background: var(--surface);
+  border: var(--hair) solid var(--border);
+  border-radius: var(--radius);
+  min-height: 0;
+  overflow: hidden;
+  transition: border-color 200ms;
+}
+
+/* Live leader: the trader with the highest portfolio value right now. A single
+   accent hairline — no glow, no shadow. */
+.panel[data-leader="true"] { border-color: var(--accent); }
+
+.panel-head {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+}
+
+.panel-id {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.panel-name {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.16em;
+  color: var(--fg);
+  white-space: nowrap;
+}
+
+.panel-model {
+  flex: 1;
+  min-width: 0;
+  font-size: 11px;
+  color: var(--fg-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.panel-flag {
+  flex: none;
+  display: none;
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--accent);
+}
+.panel[data-leader="true"] .panel-flag { display: inline; }
+
+.panel-figures {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* The value stays neutral: it is a level, not a direction. Only the delta is
+   coloured, which keeps the four panels comparable at a glance. */
+.panel-value {
+  font-variant-numeric: tabular-nums;
+  font-size: 28px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  color: var(--fg);
+}
+
+.panel-delta {
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-muted);
+  white-space: nowrap;
+}
+.panel-delta[data-trend="up"] { color: var(--up); }
+.panel-delta[data-trend="down"] { color: var(--down); }
+
+.panel-pct { font-weight: 500; opacity: 0.75; }
+
+.panel-strategy {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--fg-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  cursor: default;
+}
+.panel-strategy.empty {
+  color: var(--fg-dim);
+  font-style: italic;
+}
+
+.panel-chart {
+  min-height: 110px;
+  min-width: 0;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+/* ---- Holdings ---- */
+
+.heatmap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-height: 42px;
+  overflow: hidden;
+}
+.heatmap[data-empty="true"]::before {
+  content: "No holdings";
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding-left: 2px;
+  color: var(--fg-dim);
+  font-size: 11px;
+  font-style: italic;
+}
+
+/* Tiles carry two signals: width is share of the book, the tinted left edge is
+   direction. The tint stays low so a wall of tiles never turns into a colour block. */
+.heatmap-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 8px;
+  min-width: 74px;
+  flex-basis: 0;
+  border: var(--hair) solid var(--border);
+  border-left: 2px solid var(--up);
+  border-radius: 3px;
+  background: var(--inset);
+  color: var(--fg);
+  font-variant-numeric: tabular-nums;
+  transition: background 200ms;
+}
+.heatmap-tile[data-pnl="down"] { border-left-color: var(--down); }
+
+.heatmap-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.heatmap-ticker {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.heatmap-pct {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--up);
+}
+.heatmap-tile[data-pnl="down"] .heatmap-pct { color: var(--down); }
+
+.heatmap-value {
+  font-size: 10px;
+  color: var(--fg-dim);
+}
+
+/* Price ticks pulse the tile surface rather than flooding it with colour. */
+.heatmap-tile.flash-up { animation: flash-up 600ms ease-out; }
+.heatmap-tile.flash-down { animation: flash-down 600ms ease-out; }
+
+@keyframes flash-up {
+  0%   { background: color-mix(in srgb, var(--up) 22%, var(--inset)); }
+  100% { background: var(--inset); }
+}
+@keyframes flash-down {
+  0%   { background: color-mix(in srgb, var(--down) 22%, var(--inset)); }
+  100% { background: var(--inset); }
+}
+
+/* ---- Bottom row: activity log + recent trades ---- */
+
+/* Activity takes the larger share: its messages are long and get truncated, so
+   width buys visible characters. A trade row is a fixed "12 AAPL @ $313.40" that
+   never grows and gains nothing from more space. */
+.panel-bottom {
+  display: grid;
+  grid-template-columns: 1.7fr 1fr;
+  gap: 12px;
+  min-height: 0;
+}
+
+.panel-col {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 6px;
+  min-height: 0;
+}
+
+/* The activity column leads, so its label sits a step brighter than its neighbour's. */
+.panel-col.primary .panel-col-label { color: var(--fg-muted); }
+
+/* Both streams sit in an inset well. The container is what makes a dense
+   monospace stream read as a log instead of dissolving into the panel — a flat
+   fill and a hairline, so it costs nothing against the minimal palette. */
+.log,
+.txns {
+  height: 100%;
+  overflow-y: auto;
+  background: var(--inset);
+  border: var(--hair) solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 8px;
+  font-family: var(--mono);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+/* Activity is the primary stream: a defined edge and a little more air inside. */
+.log {
+  border-color: var(--border-strong);
+  padding: 7px 10px;
+}
+
+.log-empty,
+.txn-empty {
+  color: var(--fg-dim);
+  font-style: italic;
+}
+
+/* One line per entry, tightly stacked. Uniform rows are what make the stream
+   scannable; wrapping them turns it ragged and costs more height than it earns. */
+.log-row,
+.txn-row {
+  display: flex;
+  gap: 6px;
+  padding: 1px 0;
+  align-items: baseline;
+  white-space: nowrap;
+}
+
+.log-time,
+.txn-date {
+  flex: none;
+  color: var(--fg-dim);
+}
+
+.log-type {
+  flex: none;
+  text-transform: uppercase;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  font-weight: 700;
+}
+
+.txn-side {
+  flex: none;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+.txn-side[data-side="buy"] { color: var(--up); }
+.txn-side[data-side="sell"] { color: var(--down); }
+
+/* Full-strength text: this is the line the user is actually here to read. */
+.log-text {
+  flex: 1;
+  min-width: 0;
+  color: var(--fg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.txn-detail {
+  flex: 1;
+  min-width: 0;
+  color: var(--fg-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ---- Narrow screens ---- */
+
+/* Below two comfortable columns, stack the panels and hand scrolling to <main>;
+   the panels keep a fixed minimum so the chart still has a height to fill. */
+@media (max-width: 1100px) {
+  .panels {
+    grid-template-columns: 1fr;
+    grid-template-rows: none;
+    grid-auto-rows: minmax(600px, 1fr);
+  }
+}
+
+@media (max-width: 760px) {
+  body {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+  .sidebar {
+    flex-direction: row;
+    align-items: center;
+    gap: 22px;
+    padding: 12px 14px;
+    border-right: none;
+    border-bottom: var(--hair) solid var(--border);
+    overflow-x: auto;
+  }
+  .side-section { gap: 4px; }
+  .sidebar-spacer { min-height: 0; }
+  /* The returns ranking is the sidebar's tallest block; the panels already
+     carry the same numbers, so drop it rather than scroll a header. */
+  .side-section.returns { display: none; }
+  .panel-bottom { grid-template-columns: 1fr; }
+}
