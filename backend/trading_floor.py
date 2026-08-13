@@ -9,6 +9,7 @@ import os
 
 load_dotenv(override=True)
 
+# uv run -m trading_floor.py
 
 RUN_EVERY_N_MINUTES = int(os.getenv("RUN_EVERY_N_MINUTES", "60"))
 RUN_EVEN_WHEN_MARKET_IS_CLOSED = (
