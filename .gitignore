@@ -17,3 +17,8 @@ CLAUDE.local.md
 
 
 node_modules/
+
+
+# DBs
+accounts.db
+memory/
