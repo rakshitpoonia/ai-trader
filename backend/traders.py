@@ -32,7 +32,17 @@ GROK_BASE_URL = "https://api.x.ai/v1"
 GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
-MAX_TURNS = 30
+# Turn budgets. Both are request budgets: the Agents SDK issues exactly one model request per
+# turn, so these numbers are the ceiling on what a single run can cost.
+#
+# 10 sits well clear of every well-behaved run while capping a pathological one at a third of what it used to cost.
+MAX_TURNS = 10
+
+# The researcher is a nested agent loop, so its turns are *not* covered by MAX_TURNS; left
+# uncapped it runs at the SDK's default of 10 and was ~40% of all model requests.
+# instructions ask for - search (several queries in one parallel turn), follow up, store to the
+# knowledge graph, summarise - and cuts the long tail off.
+RESEARCHER_MAX_TURNS = 4
 
 # OpenRouter's free-models router. Not a single model: for each request OpenRouter picks
 # at random from the free models available at that moment, keeping only those that support
@@ -101,8 +111,35 @@ async def get_researcher(mcp_servers, model_name) -> Agent:
 
 
 async def get_researcher_tool(mcp_servers, model_name) -> Tool:
+    """The researcher, exposed to the trader as a tool it may call once per run.
+
+    The prompts ask for a single research phase, but asking is not enforcing: the two runaway
+    runs on record called the researcher three and four times, and each call is its own agent
+    loop of up to RESEARCHER_MAX_TURNS. So the limit is also applied in code - after the first
+    invocation the tool reports itself disabled and the SDK stops offering it to the model,
+    which simply carries on with what it learned rather than seeing a tool call fail.
+
+    The counter is a closure over this call, and `create_agent` builds a fresh tool for every
+    run, so "once" means once per run and nothing has to be reset between cycles.
+    """
     researcher = await get_researcher(mcp_servers, model_name)
-    return researcher.as_tool(tool_name="Researcher", tool_description=research_tool())
+    tool = researcher.as_tool(
+        tool_name="Researcher",
+        tool_description=research_tool(),
+        max_turns=RESEARCHER_MAX_TURNS,
+    )
+
+    used = False
+    invoke = tool.on_invoke_tool
+
+    async def invoke_once(*args, **kwargs):
+        nonlocal used
+        used = True
+        return await invoke(*args, **kwargs)
+
+    tool.on_invoke_tool = invoke_once
+    tool.is_enabled = lambda context, agent: not used
+    return tool
 
 
 class Trader:
