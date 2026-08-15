@@ -107,18 +107,19 @@ _listings_, not calls.
 **Turns are capped.** The limit is the safety net that stops an agent looping forever:
 
 ```python
-# backend/traders.py:33
-MAX_TURNS = 30
+# backend/traders.py:43
+MAX_TURNS = 13
 ```
 
 ```python
-# backend/traders.py:140
+# backend/traders.py:193
 await Runner.run(self.agent, message, max_turns=MAX_TURNS)
 ```
 
 **Nested loops.** When Warren calls the `Researcher` tool, that tool _is itself_ a `Runner.run`
-with its own turn loop, its own conversation, and its own 30-turn budget. The Researcher may take
-four turns internally; Warren spends one.
+with its own turn loop, its own conversation, and its own budget of `RESEARCHER_MAX_TURNS = 6`,
+passed to `as_tool(max_turns=...)`. The Researcher may take six turns internally; Warren spends
+one. This is why `MAX_TURNS` alone never bounded the cost of a run.
 
 ### Where the loop actually lives
 
@@ -529,7 +530,7 @@ which he must actively query. The account _is_ the memory.
 
 ### 7d. Hand it to the runner
 
-`Runner.run(agent, message, max_turns=30)` starts the loop from §3.
+`Runner.run(agent, message, max_turns=13)` starts the loop from §3.
 
 ---
 

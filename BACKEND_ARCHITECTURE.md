@@ -36,7 +36,7 @@ lie told to the model (§5.2).
 | Agents              | 4 traders × 1 Researcher sub-agent each                                                      |
 | Processes per cycle | 1 scheduler + 4 traders × 6 MCP servers ≈ 25                                                 |
 | Concurrency         | one event loop, `asyncio.gather` over 4 traders                                              |
-| Turn cap            | `MAX_TURNS = 30` per run (`traders.py:33`)                                                   |
+| Turn cap            | `MAX_TURNS = 13` per run (`traders.py:43`), plus `RESEARCHER_MAX_TURNS = 6` nested           |
 | Classes we define   | 5 (plus 2 in the dashboard)                                                                  |
 | Persistence         | one SQLite file, two tables, account stored as a single JSON blob                            |
 | Cost to run         | $0 — default path is OpenRouter's free-model router                                          |
@@ -624,8 +624,9 @@ conversation; `as_tool` returns one string. The trader never sees ten search res
 id by `make_trace_id`, and `LogTracer` parses it back out. There is no ambient context on a single
 event loop, so attribution has to travel inside the one field the framework carries.
 
-**"What stops an agent looping forever?"** — `max_turns=30`. Exceeding it raises `MaxTurnsExceeded`,
-which is caught per trader; the run is abandoned and the next cycle starts clean.
+**"What stops an agent looping forever?"** — `max_turns=13`. Exceeding it raises `MaxTurnsExceeded`,
+which is caught per trader; the run is abandoned and the next cycle starts clean. The Researcher
+sub-agent has its own nested budget of 6, which `MAX_TURNS` does not cover.
 
 **"Where's the state between runs?"** — Only two places: SQLite (balances, holdings, transactions,
 logs) and each trader's private libsql knowledge graph in `memory/<name>.db`. The agent itself is

@@ -107,3 +107,37 @@ concurrently and each still getting a real research phase.
 The measurement is the part worth keeping. The cap was never the interesting decision; knowing
 which loop was actually spending the budget was, and that came from noticing the telemetry
 already in the system could answer the question.
+
+---
+
+## Follow-up, 2026-08-15: the caps were too tight, and the sink had moved
+
+Two runs after this was written showed the caps cutting into real work rather than the long tail.
+
+**`RESEARCHER_MAX_TURNS` 4 → 6.** Three of four traders overran 4 on consecutive runs, and an
+overrun loses the research entirely — the run pays for the Tavily searches and gets nothing back,
+the worst possible outcome per request. The researcher had been fetching pages one per turn, so
+`researcher_instructions` now demands the same parallel batching for fetches that it already
+demanded for searches, and the turn budget is passed in rather than written into the prompt text
+so the two cannot drift.
+
+**`MAX_TURNS` 10 → 13.** The remaining sink was not research at all. Massive's MCP server exposes
+a generic `search_endpoints` / `call_api` / `query_data` trio over ~147 REST endpoints instead of
+a `get_price` tool, so a trader spent eight turns discovering how to price a stock and hit the cap
+without trading. The turn bump alone would only have bought a longer search, so the actual fix is
+in the prompt: the `note` in `templates.py` now names the two endpoints this plan allows —
+`/v2/aggs/ticker/SYMBOL/prev` for one symbol, grouped daily aggregates with `store_as` +
+`query_data` for many — and states that `/v2/last/trade/...` and `/v2/snapshot/...` return
+`NOT_AUTHORIZED`, so those are never tried. Endpoint discovery is not reasoning, and paying model
+requests for it was the whole loss.
+
+**The disabled-tool trick was withdrawn.** Making the spent researcher vanish via `is_enabled`
+assumed research succeeds and the trader moves on. When research instead failed on max turns, one
+trader retried, found no such tool, and the "Tool not found" error ended the turn and the whole
+run. The tool now stays visible and returns `research_spent()` — a refusal costs one turn; the
+vanishing act cost an entire trading run.
+
+Worst case per cycle rises from ~96 to 4 × (13 + 6) = ~76 model requests against a ~50/day free
+tier, so a single pathological cycle can still exhaust the day. The bet is that naming the
+endpoints removes the pathology rather than merely postponing it — which the next runs' logs,
+now legible thanks to the `MCP_TOOLS` lines, will settle.
