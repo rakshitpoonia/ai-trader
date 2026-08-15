@@ -1,5 +1,7 @@
 # 📈 AI Trader
 
+![Autonomouse AI Traders Thumbnail](public/1.png)
+
 **Four AI traders. Four strategies. One simulated market — and nobody watching over them.**
 
 AI Trader is an autonomous trading floor. Four AI agents, each modelled on a famous investor,
@@ -11,12 +13,12 @@ isn't working. You just watch the dashboard.
 
 ## 🧑‍💼 Meet the traders
 
-| Trader | Style | What drives them |
-| --- | --- | --- |
-| 🧊 **Warren** | Value | Patient, fundamentals-first, holds through the noise |
-| 🔥 **George** | Macro | Contrarian, bets boldly against the crowd |
-| ⚖️ **Ray** | Systematic | Diversified, risk-balanced, driven by economic cycles |
-| 🚀 **Cathie** | Innovation | Chases disruption, trades crypto ETFs |
+| Trader        | Style      | What drives them                                      |
+| ------------- | ---------- | ----------------------------------------------------- |
+| 🧊 **Warren** | Value      | Patient, fundamentals-first, holds through the noise  |
+| 🔥 **George** | Macro      | Contrarian, bets boldly against the crowd             |
+| ⚖️ **Ray**    | Systematic | Diversified, risk-balanced, driven by economic cycles |
+| 🚀 **Cathie** | Innovation | Chases disruption, trades crypto ETFs                 |
 
 They run at the same time, on the same market, with the same tools — so the only thing separating
 their results is how they think.
@@ -66,11 +68,11 @@ their results is how they think.
 
 Each round is one of two kinds, and every trader alternates between them:
 
-| | 🔍 **Trade phase** | ⚖️ **Rebalance phase** |
-| --- | --- | --- |
-| The question | *What should I buy that I don't own yet?* | *Is what I already own still right?* |
-| Does research | ✅ Yes — one full research pass | ❌ No — market data is enough |
-| Updates strategy | Sometimes | Often, based on real results |
+|                  | 🔍 **Trade phase**                        | ⚖️ **Rebalance phase**               |
+| ---------------- | ----------------------------------------- | ------------------------------------ |
+| The question     | _What should I buy that I don't own yet?_ | _Is what I already own still right?_ |
+| Does research    | ✅ Yes — one full research pass           | ❌ No — market data is enough        |
+| Updates strategy | Sometimes                                 | Often, based on real results         |
 
 Splitting the day this way keeps each decision focused, and means the expensive part — live web
 research — only happens when it actually changes the answer.
@@ -79,17 +81,17 @@ research — only happens when it actually changes the answer.
 
 ## 🛠️ Tech stack
 
-| Layer | Technology |
-| --- | --- |
-| 🧠 Agents | OpenAI Agents SDK |
-| 🔌 Tools | Model Context Protocol (MCP) over stdio |
-| 💬 Models | OpenRouter (free tier) · OpenAI · DeepSeek · xAI Grok · Google Gemini |
-| 💹 Market data | Massive, with a built-in price simulator as fallback |
-| 🌐 Research | Tavily search · web page fetch · persistent knowledge graph |
-| 💾 Storage | SQLite |
-| 🖥️ Dashboards | Gradio + Plotly, and FastAPI + Vite + TypeScript |
-| 🔔 Alerts | Pushover |
-| 🐍 Runtime | Python 3.12+, managed with `uv` |
+| Layer          | Technology                                                            |
+| -------------- | --------------------------------------------------------------------- |
+| 🧠 Agents      | OpenAI Agents SDK                                                     |
+| 🔌 Tools       | Model Context Protocol (MCP) over stdio                               |
+| 💬 Models      | OpenRouter (free tier) · OpenAI · DeepSeek · xAI Grok · Google Gemini |
+| 💹 Market data | Massive, with a built-in price simulator as fallback                  |
+| 🌐 Research    | Tavily search · web page fetch · persistent knowledge graph           |
+| 💾 Storage     | SQLite                                                                |
+| 🖥️ Dashboards  | Gradio + Plotly, and FastAPI + Vite + TypeScript                      |
+| 🔔 Alerts      | Pushover                                                              |
+| 🐍 Runtime     | Python 3.12+, managed with `uv`                                       |
 
 ---
 
@@ -98,15 +100,15 @@ research — only happens when it actually changes the answer.
 Every capability the traders have is a separate **MCP server** — a small standalone program the
 agent talks to. Some are ours, some are off-the-shelf.
 
-| Tool | Source | Gives the agent… |
-| --- | --- | --- |
-| 💹 `mcp_massive` | [Massive](https://github.com/massive-com/mcp_massive) | Live prices, fundamentals, indicators |
-| 🔎 `tavily-mcp` | [Tavily](https://www.npmjs.com/package/tavily-mcp) | Web search |
-| 📄 `mcp-server-fetch` | [Anthropic](https://pypi.org/project/mcp-server-fetch/) | Reading a web page |
-| 🧠 `mcp-memory-libsql` | [npm](https://www.npmjs.com/package/mcp-memory-libsql) | Permanent private memory |
-| 💰 `accounts_server` | this project | Balance, holdings, buying, selling |
-| 📈 `market_server` | this project | Simulated prices |
-| 🔔 `push_server` | this project | Phone notifications |
+| Tool                   | Source                                                  | Gives the agent…                      |
+| ---------------------- | ------------------------------------------------------- | ------------------------------------- |
+| 💹 `mcp_massive`       | [Massive](https://github.com/massive-com/mcp_massive)   | Live prices, fundamentals, indicators |
+| 🔎 `tavily-mcp`        | [Tavily](https://www.npmjs.com/package/tavily-mcp)      | Web search                            |
+| 📄 `mcp-server-fetch`  | [Anthropic](https://pypi.org/project/mcp-server-fetch/) | Reading a web page                    |
+| 🧠 `mcp-memory-libsql` | [npm](https://www.npmjs.com/package/mcp-memory-libsql)  | Permanent private memory              |
+| 💰 `accounts_server`   | this project                                            | Balance, holdings, buying, selling    |
+| 📈 `market_server`     | this project                                            | Simulated prices                      |
+| 🔔 `push_server`       | this project                                            | Phone notifications                   |
 
 ---
 
@@ -193,13 +195,13 @@ RUN_EVERY_N_MINUTES=240
 RUN_EVEN_WHEN_MARKET_IS_CLOSED=false
 ```
 
-| Key | If you leave it blank |
-| --- | --- |
-| `OPENROUTER_API_KEY` | 🚫 Required — nothing runs without it |
-| `MASSIVE_API_KEY` | Prices are simulated, market is always "open" |
-| `TAVILY_API_KEY` | Research falls back to reading pages directly |
-| `PUSHOVER_*` | No phone notifications |
-| Other model keys | Only needed with `USE_MANY_MODELS=true` |
+| Key                  | If you leave it blank                         |
+| -------------------- | --------------------------------------------- |
+| `OPENROUTER_API_KEY` | 🚫 Required — nothing runs without it         |
+| `MASSIVE_API_KEY`    | Prices are simulated, market is always "open" |
+| `TAVILY_API_KEY`     | Research falls back to reading pages directly |
+| `PUSHOVER_*`         | No phone notifications                        |
+| Other model keys     | Only needed with `USE_MANY_MODELS=true`       |
 
 ---
 
