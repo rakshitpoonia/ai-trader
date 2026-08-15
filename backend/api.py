@@ -23,6 +23,7 @@ LOG_COLORS = {
     "generation": "#dddd00",
     "response": "#aa00dd",
     "account": "#dd0000",
+    "rate_limit": "#dd0000",
 }
 DEFAULT_LOG_COLOR = "#87CEEB"
 
