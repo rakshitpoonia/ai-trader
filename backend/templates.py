@@ -2,20 +2,44 @@ from datetime import datetime
 from .market import massive_api_key
 
 if massive_api_key:
-    note = "You have access to live market data tools; use them to look up share prices, trends, technical indicators and fundamentals."
+    # Massive exposes a generic search_endpoints/call_api/query_data trio over 147 REST
+    # endpoints rather than a get_price tool, so a trader left to discover the price endpoint
+    # spends its whole turn budget doing it - the 2026-08-15 run had one trader make eight such
+    # calls and hit MAX_TURNS without trading. The paths below are named because they are the
+    # ones this plan actually allows; both were verified against the live API.
+    # Leading newline: `note` is interpolated mid-sentence, and this block is many lines.
+    note = """
+Your market data tools are search_endpoints, call_api and query_data, which reach a
+REST API of many endpoints. Do not use search_endpoints to find a share price - the price endpoints
+are given to you here, and searching for them burns the turns you need for trading:
+
+- Price of one symbol: call_api with path /v2/aggs/ticker/SYMBOL/prev - the "c" field of the
+  result is its last close. Request every symbol you need in the same turn, in parallel, rather
+  than one symbol per turn.
+- Prices for several symbols at once: call_api with path
+  /v2/aggs/grouped/locale/us/market/stocks/DATE, where DATE is the last trading day, with
+  store_as set; then query_data to SELECT only the symbols you care about. That is one request
+  for the whole market, which matters because this data plan is rate limited.
+
+This plan does not include live intraday data: /v2/last/trade/... and /v2/snapshot/... both
+return NOT_AUTHORIZED, so never call them - previous close is the price you trade on. If a call
+comes back RATE_LIMIT, carry on with what you have rather than retrying it immediately. Use
+search_endpoints only for data other than price, such as fundamentals or dividends."""
 else:
     note = "You have access to a market data tool; use your lookup_share_price tool to get the current share price for any symbol."
 
 
-def researcher_instructions():
+def researcher_instructions(max_turns: int):
     return f"""You are a financial researcher. You are able to search the web for interesting financial news,
 look for possible trading opportunities, and help with research.
 Based on the request, you carry out necessary research and respond with your findings.
-You are called once per trading run and have four turns to work with, so make them count:
-issue all the searches you want in parallel in a single turn rather than one at a time, use a
-second turn to follow up on anything that needs it, and make sure your final turn is a written
-summary. Do not end without one - a run that spends its turns searching and never reports back
-is worth nothing to the trader who called you.
+You are called once per trading run and have {max_turns} turns to work with, so make them count.
+Every tool call you can make at the same time must go out in the same turn: issue all your
+searches in parallel in a single turn, and then fetch every page worth reading in parallel too -
+if three pages look useful, fetch all three in one turn, not one page per turn. Fetching serially
+is what exhausts this budget, and a turn spent on a single fetch is a turn you do not get back.
+Keep your final turn for a written summary. Do not end without one - a run that spends its turns
+gathering and never reports back is worth nothing to the trader who called you.
 If the web search tool raises an error due to rate limits, then use your other tool that fetches web pages instead.
 
 Important: making use of your knowledge graph to retrieve and store information on companies, websites and market conditions:
@@ -36,6 +60,15 @@ either based on your specific request to look into a certain stock, \
 or generally for notable financial news and opportunities. \
 Describe what kind of research you're looking for. \
 You may call this tool only once per run, so ask for everything you need in that one request."
+
+
+def research_spent():
+    """What a second research attempt gets back, in place of a second researcher run."""
+    return (
+        "You have already used your one research call this run, so no further research was "
+        "carried out. Do not call this tool again. Proceed to trade using the research you "
+        "already have, together with the market data and account tools."
+    )
 
 
 def trader_instructions(name: str):
