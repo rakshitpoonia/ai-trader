@@ -17,6 +17,7 @@ from .templates import (
     trade_message,
     rebalance_message,
     research_tool,
+    research_spent,
 )
 from .mcp_servers import trader_mcp_servers, researcher_mcp_servers
 
@@ -35,14 +36,18 @@ OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 # Turn budgets. Both are request budgets: the Agents SDK issues exactly one model request per
 # turn, so these numbers are the ceiling on what a single run can cost.
 #
-# 10 sits well clear of every well-behaved run while capping a pathological one at a third of what it used to cost.
-MAX_TURNS = 10
+# 10 was set from runs whose market data came one tool call per fact. Massive's server instead
+# exposes a generic search_endpoints/call_api pair, so the trader spends several turns just
+# locating an endpoint before it can price anything: the 2026-08-15 run had Warren make eight
+# such calls and hit the cap with no trade placed. 13 covers that discovery phase.
+MAX_TURNS = 13
 
 # The researcher is a nested agent loop, so its turns are *not* covered by MAX_TURNS; left
 # uncapped it runs at the SDK's default of 10 and was ~40% of all model requests.
-# instructions ask for - search (several queries in one parallel turn), follow up, store to the
-# knowledge graph, summarise - and cuts the long tail off.
-RESEARCHER_MAX_TURNS = 4
+# 4 was one turn short in practice - it fits search, follow up and summarise only when nothing
+# needs a second look, and three of four traders overran it on consecutive runs, losing the
+# research entirely each time. 6 leaves room to follow up without reopening the long tail.
+RESEARCHER_MAX_TURNS = 6
 
 # OpenRouter's free-models router. Not a single model: for each request OpenRouter picks
 # at random from the free models available at that moment, keeping only those that support
@@ -103,7 +108,9 @@ def get_model(model_name: str):
 async def get_researcher(mcp_servers, model_name) -> Agent:
     researcher = Agent[Any](
         name="Researcher",
-        instructions=researcher_instructions(),
+        # The prompt states the budget so the researcher can plan for it, so it is passed in
+        # rather than written into the text - the two drifting apart is worse than either value.
+        instructions=researcher_instructions(RESEARCHER_MAX_TURNS),
         model=get_model(model_name),
         mcp_servers=mcp_servers,
     )
@@ -115,11 +122,17 @@ async def get_researcher_tool(mcp_servers, model_name) -> Tool:
 
     The prompts ask for a single research phase, but asking is not enforcing: the two runaway
     runs on record called the researcher three and four times, and each call is its own agent
-    loop of up to RESEARCHER_MAX_TURNS. So the limit is also applied in code - after the first
-    invocation the tool reports itself disabled and the SDK stops offering it to the model,
-    which simply carries on with what it learned rather than seeing a tool call fail.
+    loop of up to RESEARCHER_MAX_TURNS. So the limit is also applied in code - the second call
+    onwards returns `research_spent()` without starting a researcher.
 
-    The counter is a closure over this call, and `create_agent` builds a fresh tool for every
+    The spent tool answers rather than disappearing. Reporting itself disabled looked cheaper,
+    since the SDK then stops offering it and the model cannot spend a turn on it - but that
+    assumed research succeeds and the trader moves on. When the researcher instead failed on
+    max turns, Warren retried (as `researcher`, having also lost the casing), and a tool the
+    SDK could no longer find ended the turn with "Tool not found" and the whole run with it.
+    A flat refusal costs one turn in the rare retry case; vanishing cost an entire trading run.
+
+    The flag is a closure over this call, and `create_agent` builds a fresh tool for every
     run, so "once" means once per run and nothing has to be reset between cycles.
     """
     researcher = await get_researcher(mcp_servers, model_name)
@@ -134,11 +147,12 @@ async def get_researcher_tool(mcp_servers, model_name) -> Tool:
 
     async def invoke_once(*args, **kwargs):
         nonlocal used
+        if used:
+            return research_spent()
         used = True
         return await invoke(*args, **kwargs)
 
     tool.on_invoke_tool = invoke_once
-    tool.is_enabled = lambda context, agent: not used
     return tool
 
 
