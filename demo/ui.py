@@ -13,6 +13,7 @@ mapper = {
     "generation": Color.YELLOW,
     "response": Color.MAGENTA,
     "account": Color.RED,
+    "rate_limit": Color.RED,
 }
 
 

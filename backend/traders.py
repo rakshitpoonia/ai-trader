@@ -4,6 +4,8 @@ from contextlib import AsyncExitStack
 from functools import lru_cache
 from .accounts_client import read_accounts_resource, read_strategy_resource
 from agents import Agent, Tool, Runner, OpenAIChatCompletionsModel, trace
+from .database import write_log
+from .rate_limits import rate_limit_message
 from .tracers import make_trace_id
 from openai import AsyncOpenAI
 from dotenv import load_dotenv
@@ -160,5 +162,12 @@ class Trader:
         try:
             await self.run_with_trace()
         except Exception as e:
-            print(f"Error running trader {self.name}: {e}")
+            # A 429 is the one failure the dashboard should explain rather than just record:
+            # nothing is broken, the provider's limit is spent until the time it reported.
+            message = rate_limit_message(e)
+            if message:
+                write_log(self.name, "rate_limit", message)
+            else:
+                message = f"Error running trader {self.name}: {e}"
+            print(message)
         self.do_trade = not self.do_trade
