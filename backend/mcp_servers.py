@@ -22,11 +22,29 @@ MCP_PIN = "mcp<2"
 MEMORY_DIR = PROJECT_DIR / "memory"
 MEMORY_DIR.mkdir(exist_ok=True)
 
+# Every server is named, because the name is the only handle the tracer gets on where a
+# tool came from: the SDK stamps it onto the list_tools span and onto each tool call's
+# `mcp_data`. Unnamed servers all collapse to "stdio: uvx"/"stdio: uv"/"stdio: npx",
+# which cannot tell our own servers apart from anyone else's.
+ACCOUNTS_SERVER = "Accounts"
+PUSH_SERVER = "Push Notification"
+MARKET_SERVER = "Market Data"
+MASSIVE_SERVER = "Massive Market Data"
+FETCH_SERVER = "Fetch"
+SEARCH_SERVER = "Tavily Search"
+MEMORY_SERVER = "Memory"
+
+# The servers whose code lives in this repo. `tracers.py` announces tool calls on every
+# other server as MCP_TOOLS lines; ours stay plain `function` lines, since they are our
+# own domain actions rather than a third-party service being reached out to.
+INTERNAL_MCP_SERVERS = {ACCOUNTS_SERVER, PUSH_SERVER, MARKET_SERVER}
+
 
 # The market data server for the trader.
 # With a key, hand the agent Massive's own market data server, run locally over stdio.
 # Without one, use simulated prices.
 if massive_api_key:
+    market_server_name = MASSIVE_SERVER
     market_params = {
         "command": "uvx",
         "args": [
@@ -37,6 +55,7 @@ if massive_api_key:
         "env": {"MASSIVE_API_KEY": massive_api_key},
     }
 else:
+    market_server_name = MARKET_SERVER
     market_params = {"command": "uv", "args": [
         "run", "-m", "backend.market_server"], "cwd": PROJECT_DIR}
 
@@ -45,13 +64,13 @@ else:
 def trader_mcp_servers() -> list[MCPServerStdio]:
     """The trader's MCP servers: our Accounts server, Push Notification and Market data."""
     params = [
-        {"command": "uv", "args": [
-            "run", "-m", "backend.accounts_server"], "cwd": PROJECT_DIR},
-        {"command": "uv", "args": ["run", "-m",
-                                   "backend.push_server"], "cwd": PROJECT_DIR},
-        market_params,
+        (ACCOUNTS_SERVER, {"command": "uv", "args": [
+            "run", "-m", "backend.accounts_server"], "cwd": PROJECT_DIR}),
+        (PUSH_SERVER, {"command": "uv", "args": ["run", "-m",
+                                                 "backend.push_server"], "cwd": PROJECT_DIR}),
+        (market_server_name, market_params),
     ]
-    return [MCPServerStdio(p, client_session_timeout_seconds=TIMEOUT) for p in params]
+    return [MCPServerStdio(p, name=name, client_session_timeout_seconds=TIMEOUT) for name, p in params]
 
 # the researcher's MCP servers: Fetch, Tavily web search and Memory.
 
@@ -64,11 +83,13 @@ def researcher_mcp_servers(name: str) -> list[MCPServerStdio]:
     """
     fetch = MCPServerStdio(
         {"command": "uvx", "args": ["--with", MCP_PIN, "mcp-server-fetch"]},
+        name=FETCH_SERVER,
         client_session_timeout_seconds=TIMEOUT,
     )
     search = MCPServerStdio(
         {"command": "npx", "args": [
             "-y", "tavily-mcp@latest"], "env": tavily_env},
+        name=SEARCH_SERVER,
         client_session_timeout_seconds=TIMEOUT,
         tool_filter=create_static_tool_filter(
             # restricts the researcher to just the search tool
@@ -83,6 +104,7 @@ def researcher_mcp_servers(name: str) -> list[MCPServerStdio]:
             # otherwise it resolves against whatever directory the scheduler was launched from.
             "cwd": PROJECT_DIR,
         },
+        name=MEMORY_SERVER,
         client_session_timeout_seconds=TIMEOUT,
     )
     return [fetch, search, memory]

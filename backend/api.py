@@ -24,6 +24,7 @@ LOG_COLORS = {
     "response": "#aa00dd",
     "account": "#dd0000",
     "rate_limit": "#dd0000",
+    "mcp_tools": "#87CEEB",
 }
 DEFAULT_LOG_COLOR = "#87CEEB"
 

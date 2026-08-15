@@ -14,6 +14,7 @@ mapper = {
     "response": Color.MAGENTA,
     "account": Color.RED,
     "rate_limit": Color.RED,
+    "mcp_tools": Color.CYAN,
 }
 
 
