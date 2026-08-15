@@ -7,6 +7,18 @@ import type { LogRow } from "./api";
 // How far from the bottom still counts as "following the stream".
 const PIN_SLOP_PX = 24;
 
+// Log rows are stamped by SQLite's datetime('now'), which is UTC — not the trading floor
+// machine's clock, and not the transaction timestamps beside them, which Python writes in
+// local time. Render them in IST so the panel reads as one wall clock.
+const TIME_ZONE = "Asia/Kolkata";
+const timeFormat = new Intl.DateTimeFormat("en-GB", {
+  timeZone: TIME_ZONE,
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: false,
+});
+
 export class LogView {
   private host: HTMLElement;
 
@@ -63,7 +75,13 @@ export class LogView {
 }
 
 function timeOf(stamp: string): string {
-  // Stored as "YYYY-MM-DD HH:MM:SS"; show just the time.
-  const parts = stamp.split(" ");
-  return parts.length > 1 ? parts[1] : stamp;
+  // Stored as "YYYY-MM-DD HH:MM:SS" with no zone marker, so Date would otherwise read it
+  // as the viewer's local time. The "Z" is what makes it parse as the UTC it actually is.
+  const utc = new Date(`${stamp.replace(" ", "T")}Z`);
+  if (Number.isNaN(utc.getTime())) {
+    // Unparseable stamp: show the raw clock field rather than "Invalid Date".
+    const parts = stamp.split(" ");
+    return parts.length > 1 ? parts[1] : stamp;
+  }
+  return timeFormat.format(utc);
 }
