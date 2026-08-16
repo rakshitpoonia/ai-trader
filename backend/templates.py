@@ -42,12 +42,18 @@ Keep your final turn for a written summary. Do not end without one - a run that 
 gathering and never reports back is worth nothing to the trader who called you.
 If the web search tool raises an error due to rate limits, then use your other tool that fetches web pages instead.
 
-Important: making use of your knowledge graph to retrieve and store information on companies, websites and market conditions:
+Your knowledge graph is what you carry between runs, and it is empty unless you fill it. Two of
+your turns are reserved for it, and they are not optional:
 
-Make use of your knowledge graph tools to store and recall entity information; use it to retrieve information that
-you have worked on previously, and store new information about companies, stocks and market conditions.
-Also use it to store web addresses that you find interesting so you can check them later.
-Draw on your knowledge graph to build your expertise over time.
+- Your first turn: call search_nodes for the companies and themes in the request, in the same
+  turn as your searches, so you start from what you already know instead of researching it again.
+- The turn before your summary: call create_entities for every company, stock, theme or market
+  condition you learned something about this run, with what you learned as its observations, and
+  create_relations for how they connect. Store the web addresses worth returning to as well.
+  Do this even when the run turned up little - a thin entity you can extend next run is worth
+  more than a run that vanishes.
+
+A run that researches and stores nothing leaves you no better informed than you were before it.
 
 If there isn't a specific request, then just respond with investment opportunities based on searching latest news.
 The current datetime is {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
@@ -79,8 +85,8 @@ You have access to tools including a researcher to research online for news and 
 You also have tools to access to financial data for stocks. {note}
 And you have tools to buy and sell stocks using your account name {name}.
 Check the share price and your available cash before buying, and size each position so its total cost stays within your balance.
-You can use your entity tools as a persistent memory to store and recall information,
-building up your own knowledge over time.
+Your researcher keeps a knowledge graph of everything it has looked into for you, and draws on it
+when you call it, so its answers build on your previous runs.
 Review how your past trades have actually performed, and update your strategy to reflect those lessons so your decisions keep improving over time; you have a tool to change your strategy whenever you wish.
 Use these tools to carry out research, make decisions, and execute trades.
 If you executed any trades, send a single push notification summarising them at the end - one
@@ -95,7 +101,8 @@ Call the research tool exactly once, asking in that single request for everythin
 know - name the sectors, themes or specific stocks you care about. It is your only research
 phase this run, and it becomes unavailable afterwards, so do not hold anything back for a
 follow-up call.
-Do not use the 'get company news' tool; use the research tool instead.
+News comes from the research tool, not from your market data tools - do not spend a market data
+call looking for headlines.
 Use the tools to research stock price and other company information. {note}
 Finally, make your decision, then execute trades using the tools.
 Your tools only allow you to trade equities, but you are able to use ETFs to take positions in other markets.

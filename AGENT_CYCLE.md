@@ -586,6 +586,12 @@ Warren, turn 1
 That final paragraph becomes the return value of the `Researcher` tool call. It is appended to
 **Warren's** conversation as a single tool result. Warren never sees the three searches.
 
+That shape — recall alongside the searches, store before the summary — is what
+`researcher_instructions` now requires, not what the model happens to do. Left as encouragement
+it did not happen: through 2026-08-15, `create_entities` had been called exactly twice across
+every run of all four traders, and `memory/Cathie.db` and `memory/George.db` were still empty.
+The two reserved turns are the reason `RESEARCHER_MAX_TURNS` is 6 rather than 4.
+
 **When is the Researcher called?** Whenever the model decides to — but in practice it is called
 early and often, because both prompts open with an explicit instruction to do so
 (`backend/templates.py:54`: _"Use the research tool to find news and opportunities consistent with
@@ -884,6 +890,10 @@ Then the `AsyncExitStack` unwinds: all six MCP subprocesses shut down. The trace
 | the strategy (possibly rewritten) | same row, `strategy`                    | `change_strategy`, rebalance cycles          |
 | the audit log                     | `accounts.db` → `logs` table            | continuously, by the tracer and by `Account` |
 | the researcher's knowledge graph  | `memory/Warren.db`                      | when the researcher calls `create_entities`  |
+
+Note the last row is the **researcher's**, not the trader's: the memory server is attached in
+`researcher_mcp_servers`, so trades write nothing to it and a graph can be empty for a trader
+who trades every cycle, or full for one that has never traded.
 
 Everything else — the agent, the conversation, the six subprocesses — is gone. The next cycle is
 rebuilt from the database.

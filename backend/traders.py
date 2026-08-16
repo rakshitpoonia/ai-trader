@@ -47,6 +47,9 @@ MAX_TURNS = 13
 # 4 was one turn short in practice - it fits search, follow up and summarise only when nothing
 # needs a second look, and three of four traders overran it on consecutive runs, losing the
 # research entirely each time. 6 leaves room to follow up without reopening the long tail.
+# It is also what makes the knowledge graph affordable: recall and store are two of those turns
+# (see researcher_instructions), and under 4 they were always the first thing dropped - two of
+# the four traders had never written a single entity.
 RESEARCHER_MAX_TURNS = 6
 
 # OpenRouter's free-models router. Not a single model: for each request OpenRouter picks

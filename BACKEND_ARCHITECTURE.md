@@ -630,7 +630,9 @@ sub-agent has its own nested budget of 6, which `MAX_TURNS` does not cover.
 
 **"Where's the state between runs?"** — Only two places: SQLite (balances, holdings, transactions,
 logs) and each trader's private libsql knowledge graph in `memory/<name>.db`. The agent itself is
-rebuilt from scratch every cycle and holds nothing.
+rebuilt from scratch every cycle and holds nothing. The graph belongs to the **researcher**, which
+is the only agent holding the memory server — trading writes to SQLite, never to `memory/`, so the
+two can disagree completely about how busy a trader has been.
 
 **"How would you scale this?"** — The process boundary is already the seam. The MCP servers become
 network services instead of stdio children, `Account` gets row-level locking or optimistic
