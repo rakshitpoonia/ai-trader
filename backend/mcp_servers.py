@@ -25,7 +25,9 @@ MEMORY_DIR.mkdir(exist_ok=True)
 # Every server is named, because the name is the only handle the tracer gets on where a
 # tool came from: the SDK stamps it onto the list_tools span and onto each tool call's
 # `mcp_data`. Unnamed servers all collapse to "stdio: uvx"/"stdio: uv"/"stdio: npx",
-# which cannot tell our own servers apart from anyone else's.
+# which cannot tell one server's tools from another's. `tracers.py` keys its dashboard
+# wording off these constants (SERVER_ACTIVITY), so renaming one changes what the log panel
+# says - import them there rather than repeating the strings.
 ACCOUNTS_SERVER = "Accounts"
 PUSH_SERVER = "Push Notification"
 MARKET_SERVER = "Market Data"
@@ -33,11 +35,6 @@ MASSIVE_SERVER = "Massive Market Data"
 FETCH_SERVER = "Fetch"
 SEARCH_SERVER = "Tavily Search"
 MEMORY_SERVER = "Memory"
-
-# The servers whose code lives in this repo. `tracers.py` announces tool calls on every
-# other server as MCP_TOOLS lines; ours stay plain `function` lines, since they are our
-# own domain actions rather than a third-party service being reached out to.
-INTERNAL_MCP_SERVERS = {ACCOUNTS_SERVER, PUSH_SERVER, MARKET_SERVER}
 
 
 # The market data server for the trader.
