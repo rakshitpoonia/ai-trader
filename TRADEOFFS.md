@@ -141,3 +141,50 @@ Worst case per cycle rises from ~96 to 4 × (13 + 6) = ~76 model requests agains
 tier, so a single pathological cycle can still exhaust the day. The bet is that naming the
 endpoints removes the pathology rather than merely postponing it — which the next runs' logs,
 now legible thanks to the `MCP_TOOLS` lines, will settle.
+
+---
+
+## The log panel, 2026-08-16: two problems, one measurement
+
+Two changes landed together, both settled by reading `logs` in `accounts.db` rather than by
+argument.
+
+**The knowledge graph was optional, so it did not happen.** `memory/Cathie.db` and
+`memory/George.db` held nothing but empty tables. The natural guess — that they had not traded
+enough to have anything to remember — was wrong in both directions: the memory server is attached
+in `researcher_mcp_servers`, so trades cannot write to it at all, and Warren, who has never called
+`buy_shares`, held the largest graph at 18 entities. The real count was that across every run of
+all four traders, `create_entities` had been called **twice**. `researcher_instructions` had asked
+for the graph as encouragement, and encouragement lost every time to search, fetch and the summary
+inside a 4-turn budget. It is now two required turns — `search_nodes` alongside the first search,
+`create_entities` before the summary — which is a second justification for
+`RESEARCHER_MAX_TURNS = 6` and leaves 2 turns of slack rather than 4. If researchers start
+overrunning again, the cause is that reserved store turn and the fix is 7, not dropping the
+requirement.
+
+Two phantom tools went with it: `trade_message` forbade a `'get company news'` tool that does not
+exist, and `trader_instructions` told the trader it had entity tools, which only the researcher
+has. Prompt text describing tools the agent does not hold is not harmless — it is turns spent
+looking for them.
+
+**The log panel was written for whoever wrote the code.** `Ended mcp_tools stdio: uvx` names a
+transport and a package runner; `Search Endpoints Started` names an implementation detail. The
+panel is a demo surface, so the wording now comes from the **server** rather than the tool:
+`Getting market data`, `Improving knowledge graph`, `Fetching web page`,
+`Pushing notifications to mobile`. That is the right unit because Massive's three tools and the
+memory server's six are each one activity under several names.
+
+The accounts server is the deliberate exception. Its five tools are the trader's actual decisions,
+and collapsing `buy_shares` into the same line as `get_balance` would hide the only events anyone
+watching actually cares about — so `TOOL_ACTIVITY` overrides the server wording for those five.
+The cost is a second table to maintain; the alternative was a panel where a purchase looked like a
+lookup.
+
+This also reversed an earlier decision. Our own servers used to be excluded from `MCP_TOOLS` lines
+on the grounds that they were "domain actions, not third-party calls" — a distinction that matters
+to the code and to nobody reading the dashboard. `INTERNAL_MCP_SERVERS` is gone; `function` now
+carries only the `Researcher`, which is genuinely not an MCP tool.
+
+Everything else — `turn`, `generation`, `agent`, `trace`, `task`, `account` — keeps its raw
+format. Those lines are for debugging, and rewording them would cost the precision that makes them
+useful without helping a viewer who is not reading them anyway.

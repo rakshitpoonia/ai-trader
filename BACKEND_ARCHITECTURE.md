@@ -77,12 +77,17 @@ lie told to the model (§5.2).
 | `traders.py`           | `accounts_client`, `templates`, `mcp_servers`, `tracers` | **not** `accounts` — see §2                |
 | `mcp_servers.py`       | `market` (key only)                                      | builds the six server configs              |
 | `templates.py`         | `market` (key only)                                      | all agent-facing prose                     |
-| `tracers.py`           | `database`                                               | turns SDK spans into log rows              |
+| `tracers.py`           | `database`, `mcp_servers` (names only)                   | turns SDK spans into log rows              |
 | `accounts_client.py`   | —                                                        | spawns `accounts_server` to read resources |
 | `accounts_server.py`   | `accounts`                                               | the MCP face of the domain model           |
 | `accounts.py`          | `market`, `database`                                     | the domain model                           |
 | `market.py`            | `market_simulator`                                       | pricing with fallback                      |
 | `api.py`, `demo/ui.py` | `accounts`, `database`, `trading_floor`                  | read-only frontends                        |
+
+`tracers.py` imports `mcp_servers` for its server-name constants alone — never for the server
+objects. The log panel describes a tool call by the server it belongs to (`Getting market data`,
+`Improving knowledge graph`), so the two files have to agree on those names; importing the
+constants is what stops the wording drifting from the configuration.
 
 Dependency arrows only ever point downward, with one deliberate exception: `templates.py` and
 `mcp_servers.py` both reach into `market.py` for the single flag `massive_api_key`. Prompts and

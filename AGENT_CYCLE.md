@@ -101,8 +101,10 @@ JSON is stripped of its long value-history before it goes into the prompt
 
 **Tools are re-listed every turn.** Step 1 runs each time, not once. The framework asks all three
 of Warren's MCP servers "what tools do you have?" at the top of every turn. With 3 servers and
-12 turns, that is 36 tool listings — they show up in the logs as `mcp_tools` entries, and they are
-_listings_, not calls.
+12 turns, that is 36 tool listings. They used to be logged, and drowned the panel — dozens of rows
+per run saying only that a server had been asked its tool list. `LogTracer` now swallows them,
+keeping the tool→server mapping they carry (§6a) and writing nothing. The `mcp_tools` log type was
+reused for the thing a reader actually wants: real tool _calls_.
 
 **Turns are capped.** The limit is the safety net that stops an agent looping forever:
 
@@ -316,7 +318,7 @@ Four traders run concurrently on one event loop, and the framework's tracing hoo
 that knows its trace _id_ but not which trader made it. So the name is encoded **into** the id:
 
 ```python
-# backend/tracers.py:9
+# backend/tracers.py:60
 def make_trace_id(tag: str) -> str:
     """Return a string of the form 'trace_<tag><random>' ... total 32 chars after 'trace_'."""
     tag += "0"
@@ -329,7 +331,7 @@ def make_trace_id(tag: str) -> str:
 out by splitting on `_` and then on `0`:
 
 ```python
-# backend/tracers.py:22
+# backend/tracers.py:73
     def get_name(self, trace_or_span: Trace | Span) -> str | None:
         trace_id = trace_or_span.trace_id
         name = trace_id.split("_")[1]
@@ -384,16 +386,21 @@ Six servers per run:
 | Researcher | `mcp-memory-libsql`       | knowledge-graph tools over `memory/Warren.db`                                 |
 
 ```python
-# backend/mcp_servers.py:45
+# backend/mcp_servers.py:60
 def trader_mcp_servers() -> list[MCPServerStdio]:
     """The trader's MCP servers: our Accounts server, Push Notification and Market data."""
     params = [
-        {"command": "uv", "args": ["run", "-m", "backend.accounts_server"], "cwd": PROJECT_DIR},
-        {"command": "uv", "args": ["run", "-m", "backend.push_server"], "cwd": PROJECT_DIR},
-        market_params,
+        (ACCOUNTS_SERVER, {"command": "uv", "args": [...], "cwd": PROJECT_DIR}),
+        (PUSH_SERVER, {"command": "uv", "args": [...], "cwd": PROJECT_DIR}),
+        (market_server_name, market_params),
     ]
-    return [MCPServerStdio(p, client_session_timeout_seconds=TIMEOUT) for p in params]
+    return [MCPServerStdio(p, name=name, client_session_timeout_seconds=TIMEOUT)
+            for name, p in params]
 ```
+
+Every server is **named**, and the names are module constants rather than literals. Without a name
+the SDK labels a server by its command, so all three of Warren's collapse to `stdio: uv` and a log
+line cannot say which one was reached. §6c depends on those names.
 
 The Tavily server is filtered down to a single tool so the researcher reaches for plain search
 rather than heavier crawl or deep-research tools:
@@ -423,6 +430,54 @@ Cathie's, so their accumulated research never mixes:
         client_session_timeout_seconds=TIMEOUT,
     )
 ```
+
+### 6c. Turning tool calls into readable log lines
+
+The dashboard's log panel is meant to be legible to someone who has never seen this code, so
+`LogTracer` does not print tool names. It prints what the tool call **is**, keyed off the server
+that owns the tool (`SERVER_ACTIVITY` in `backend/tracers.py:32`):
+
+| server                | log line                                    |
+| --------------------- | ------------------------------------------- |
+| `Tavily Search`       | `Tavily Search Started` / `Ended`           |
+| `Memory`              | `Improving knowledge graph Started`         |
+| `Massive Market Data` | `Getting market data Started`               |
+| `Market Data`         | `Getting market data Started`               |
+| `Fetch`               | `Fetching web page Started`                 |
+| `Push Notification`   | `Pushing notifications to mobile Started`   |
+| `Accounts`            | per tool, see below                         |
+
+The server, not the tool, is the right unit for almost all of them: Massive's `search_endpoints`,
+`call_api` and `query_data` are three names for one activity, and none of the three says "market
+data" to a reader. The memory server's six tools are likewise one activity.
+
+The accounts server is the exception, because its tools are the trader's actual decisions and
+`Buying shares` must not read the same as `Checking cash balance`. `TOOL_ACTIVITY`
+(`backend/tracers.py:46`) overrides the server wording for those five:
+
+| tool              | log line                    |
+| ----------------- | --------------------------- |
+| `buy_shares`      | `Buying shares`             |
+| `sell_shares`     | `Selling shares`            |
+| `get_balance`     | `Checking cash balance`     |
+| `get_holdings`    | `Checking current holdings` |
+| `change_strategy` | `Updating trading strategy` |
+
+Both tables fall back to a prettified tool name (`tavily_search` → `Tavily Search`) for anything
+unmapped, so adding a server degrades to the old behaviour rather than losing the line.
+
+`Started`/`Ended` is appended by the same code path that writes every other span, and the span's
+error, if any, is appended after it — a failing tool call still says what it was.
+
+**How the tracer knows which server a tool belongs to** is the subtle part. A tool call's own
+`mcp_data` carries its server, but the SDK fills that in only when the call *ends*, and the panel
+needs the line at *start*. The one place the mapping appears early enough is the `list_tools`
+handshake from §6b: its span reports the server and the names of every tool on it. So `LogTracer`
+harvests that into a module-level `_tool_servers` dict and then drops the line. That is the same
+handshake noise described in §5 — it now pays for itself instead of filling the panel.
+
+One consequence: the **`function`** log type is now reserved for the `Researcher`, the only tool
+that is not an MCP tool (it is a local `as_tool`, so it never appears in `_tool_servers`).
 
 ---
 
@@ -915,8 +970,8 @@ SELECT datetime, type, message FROM logs WHERE name = 'warren' ORDER BY id;
 | `agent`      | an agent taking control (`Warren`, then `Researcher`)       |
 | `turn`       | one iteration of the loop                                   |
 | `generation` | one call to the model                                       |
-| `function`   | one tool call — including `Researcher` itself               |
-| `mcp_tools`  | a tool _listing_ at the top of a turn, not a call           |
+| `function`   | the `Researcher` sub-agent tool — the only non-MCP tool     |
+| `mcp_tools`  | one MCP tool call, described in plain English (§6c)         |
 | `account`    | written directly by `Account` methods — `Bought 60 of KO`   |
 
 Because the Researcher's spans inherit Warren's trace id, its `agent` / `turn` / `generation`
