@@ -2,6 +2,8 @@
 
 ![Autonomouse AI Traders Thumbnail](public/1.png)
 
+Demo Video Link : https://youtu.be/lw4kzmZ_RGk
+
 **Four AI traders. Four strategies. One simulated market — and nobody watching over them.**
 
 AI Trader is an autonomous trading floor. Four AI agents, each modelled on a famous investor,
